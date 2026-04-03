@@ -18,7 +18,7 @@
 
 <br/>
 
-**Hitesh Chaudhari · Aayush Raja**
+**Hitesh Chaudhari · Aayush Raj**
 Vellore Institute of Technology, Vellore, India
 
 </div>
