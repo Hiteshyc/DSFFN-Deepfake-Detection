@@ -1,104 +1,127 @@
-# DSFFN: Dual-Stream Forgery Fusion Network
-### Robust Cross-Domain Deepfake Detection
+<div align="center">
 
-> **Authors:** Hitesh Chaudhari, Aayush Raja — Vellore Institute of Technology, Vellore, India
+<br/>
+
+```
+██████╗ ███████╗███████╗███████╗███╗   ██╗
+██╔══██╗██╔════╝██╔════╝██╔════╝████╗  ██║
+██║  ██║███████╗█████╗  █████╗  ██╔██╗ ██║
+██║  ██║╚════██║██╔══╝  ██╔══╝  ██║╚██╗██║
+██████╔╝███████║██║     ██║     ██║ ╚████║
+╚═════╝ ╚══════╝╚═╝     ╚═╝     ╚═╝  ╚═══╝
+```
+
+# Dual-Stream Forgery Fusion Network
+
+**Robust Cross-Domain Deepfake Detection**
+
+[![Python](https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.1-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org)
+[![CUDA](https://img.shields.io/badge/CUDA-12.0-76B900?style=flat-square&logo=nvidia&logoColor=white)](https://developer.nvidia.com/cuda-toolkit)
+[![License](https://img.shields.io/badge/License-Academic-blue?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Google%20Colab-F9AB00?style=flat-square&logo=googlecolab&logoColor=white)](https://colab.research.google.com)
+
+<br/>
+
+> *"A deepfake detector is only as good as the forgeries it has never seen."*
+
+<br/>
+
+**Hitesh Chaudhari · Aayush Raja**
+Vellore Institute of Technology, Vellore, India
+
+</div>
 
 ---
 
-## Overview
+## The Problem
 
-The **Dual-Stream Forgery Fusion Network (DSFFN)** is a deepfake detection architecture designed to address the core challenge of *domain shift* — the tendency of detectors to fail when encountering forgeries from sources they weren't trained on.
+Modern deepfake detectors are brittle. Train them on one dataset, and they collapse the moment they encounter forgeries from a different source — a phenomenon known as **domain shift**.
 
-DSFFN learns complementary forgery cues from two parallel input streams:
-- **Spatial (RGB) Stream** — captures visual/textural artifacts and blending inconsistencies
-- **Frequency (Phase) Stream** — reveals structural and generative-process anomalies invisible to the naked eye
+The root cause: most detectors learn *shallow, dataset-specific shortcuts* (like a particular blending artifact or compression pattern) rather than *fundamental forgery signatures*. When those shortcuts don't appear in unseen data, the model fails.
 
-By fusing both representations, DSFFN achieves significantly better cross-domain generalization than single-stream baselines.
+**DSFFN** directly attacks this problem.
 
 ---
 
-## Key Results
+## The Solution
 
-### Test 1 — Intra-Dataset Performance (manjilkarki test set)
+<div align="center">
+
+```
+┌──────────────────────────────────────────────────┐
+│               Input Image (RGB)                  │
+└────────────────┬─────────────────┬───────────────┘
+                 │                 │
+                 ▼                 ▼
+     ┌───────────────┐   ┌──────────────────────┐
+     │ Spatial Stream│   │  Frequency Transform │
+     │  (RGB as-is)  │   │  (Phase via 2D DFT)  │
+     └───────┬───────┘   └──────────┬───────────┘
+             │                      │
+             ▼                      ▼
+   ┌──────────────────┐   ┌──────────────────────┐
+   │  EfficientNet-B0 │   │   EfficientNet-B0    │
+   │ Spatial Backbone │   │  Frequency Backbone  │
+   └────────┬─────────┘   └──────────┬───────────┘
+            │                        │
+            └───────────┬────────────┘
+                        │
+                        ▼
+           ┌────────────────────────┐
+           │   Feature Fusion Layer │
+           │  cat(F_spatial,F_freq) │
+           └────────────┬───────────┘
+                        │
+                        ▼
+           ┌────────────────────────┐
+           │    Classifier (MLP)    │
+           │ Linear→ReLU→Drop→Linear│
+           └────────────┬───────────┘
+                        │
+                        ▼
+              Real  /  Fake  (BCE)
+```
+
+</div>
+
+The key insight: **spatial features** catch what's visually wrong. **Phase-spectrum features** reveal what the generative process left behind — structural traces that survive domain shifts. Together, they're fundamentally harder to fool than either alone.
+
+---
+
+## Results
+
+### Test 1 — Intra-Dataset (same distribution)
 
 | Model | Accuracy | AUC |
-|---|---|---|
-| Spatial-Only | 88.79% | 97.51% |
+|:------|:--------:|:---:|
 | Frequency-Only | 72.46% | 82.27% |
-| **DSFFN (Fused)** | **90.12%** | **98.01%** |
+| Spatial-Only | 88.79% | 97.51% |
+| **DSFFN (Ours)** | **90.12%** | **98.01%** |
 
-### Test 2 — Cross-Dataset Generalization (unseen ciplab dataset)
+### Test 2 — Cross-Dataset (unseen forgeries — the real test)
 
-| Model | Intra-Dataset Acc | Cross-Dataset Acc | Generalization Gap |
-|---|---|---|---|
+| Model | Home Acc | Unseen Acc | Gap |
+|:------|:--------:|:----------:|:---:|
 | Spatial-Only | 88.79% | 68.14% | −20.65% |
 | Frequency-Only | 72.46% | 61.30% | −11.16% |
-| **DSFFN (Fused)** | **90.12%** | **74.52%** | **−15.60%** |
+| **DSFFN (Ours)** | **90.12%** | **74.52%** | **−15.60%** |
 
-**DSFFN reduces the generalization gap by 5.05%** compared to the spatial-only baseline — a concrete demonstration of improved cross-domain robustness.
-
----
-
-## Architecture
-
-```
-Input Image (RGB)
-      │
-      ├────────────────────────────────────┐
-      │                                    │
-      ▼                                    ▼
-Spatial Stream                    Frequency Transform
-(EfficientNet-B0)                 (Phase Spectrum via DFT)
-      │                                    │
-      ▼                                    ▼
- F_spatial                        Frequency Stream
- (feature vector)                 (EfficientNet-B0)
-      │                                    │
-      └──────────────┬─────────────────────┘
-                     │
-                     ▼
-            Feature Fusion Layer
-            (Concatenate F_spatial + F_freq)
-                     │
-                     ▼
-            Classifier Head (MLP)
-            Linear(N*2 → 512) → ReLU → Dropout(0.5) → Linear(512 → 1)
-                     │
-                     ▼
-            Classification Loss (BCE)
-```
+> **DSFFN closes the generalization gap by 5.05%** compared to the spatial baseline — a direct, measurable improvement in cross-domain robustness.
 
 ---
 
-## Datasets
+## Setup
 
-| Dataset | Role | Kaggle ID | Train Images | Test Images |
-|---|---|---|---|---|
-| Deepfake and Real Images | Training + Intra-Dataset Test | `manjilkarki/deepfake-and-real-images` | 140,000 (70k each class) | 20,000 (10k each class) |
-| Real and Fake Face Detection | Cross-Dataset Generalization Test | `ciplab/real-and-fake-face-detection` | 0 (unseen) | ~2,041 (~1k each class) |
-
----
-
-## Setup & Installation
-
-### Prerequisites
-
-- Python 3.10+
-- CUDA-enabled GPU (experiments used NVIDIA T4 16GB)
-- Kaggle API credentials (`kaggle.json`)
-
-### Install Dependencies
+### 1 · Clone & install dependencies
 
 ```bash
-pip install torch torchvision
-pip install opencv-python
-pip install scikit-learn
-pip install tqdm
-pip install kaggle
-pip install numpy pillow
+git clone https://github.com/your-username/DSFFN.git
+cd DSFFN
+pip install torch torchvision opencv-python scikit-learn tqdm pillow kaggle numpy
 ```
 
-### Configure Kaggle API
+### 2 · Configure Kaggle API
 
 ```bash
 mkdir -p ~/.kaggle
@@ -106,71 +129,57 @@ cp kaggle.json ~/.kaggle/
 chmod 600 ~/.kaggle/kaggle.json
 ```
 
----
-
-## Running the Experiments
-
-This project is structured as a single end-to-end Colab notebook. Steps are clearly demarcated and can be run sequentially.
-
-### Step 1 — Download Training Dataset
+### 3 · Download datasets
 
 ```bash
+# Training + intra-dataset evaluation
 kaggle datasets download -d manjilkarki/deepfake-and-real-images
-unzip -o -q deepfake-and-real-images.zip -d /content/dataset
-```
+unzip -o -q deepfake-and-real-images.zip -d ./dataset
 
-Expected structure:
-```
-/content/dataset/Dataset/
-├── Train/
-│   ├── Real/      ← real training images (.jpg)
-│   └── Fake/      ← fake training images (.jpg)
-└── Test/
-    ├── Real/
-    └── Fake/
-```
-
-### Step 2 — Train All Models
-
-Three models are trained in sequence for 6 epochs each:
-
-```python
-# Spatial-Only baseline
-model_spatial = SpatialOnlyModel().to(device)
-
-# Frequency-Only baseline
-model_freq = FreqOnlyModel().to(device)
-
-# DSFFN (proposed)
-model_fused = DSFFN().to(device)
-```
-
-All models use:
-- **Backbone:** EfficientNet-B0 (ImageNet pretrained)
-- **Optimizer:** Adam, lr = 1e-4
-- **Loss:** BCEWithLogitsLoss
-- **Batch size:** 64
-- **Epochs:** 6
-- **Image size:** 224×224
-
-### Step 3 — Cross-Dataset Evaluation
-
-Download the unseen generalization dataset:
-
-```bash
+# Cross-dataset generalization test (unseen)
 kaggle datasets download -d ciplab/real-and-fake-face-detection
-unzip -o -q real-and-fake-face-detection.zip -d /content/ciplab_dataset
+unzip -o -q real-and-fake-face-detection.zip -d ./ciplab_dataset
 ```
 
-The trained models (no retraining) are evaluated directly on this dataset.
+Expected structure after unzipping:
+
+```
+dataset/
+└── Dataset/
+    ├── Train/
+    │   ├── Real/    ← 70,000 images
+    │   └── Fake/    ← 70,000 images
+    └── Test/
+        ├── Real/    ← 10,000 images
+        └── Fake/    ← 10,000 images
+```
 
 ---
 
-## Data Preprocessing
+## Running Experiments
 
-Each image generates **two inputs** for the dual-stream network:
+The full pipeline runs sequentially in a single script. Steps are clearly labeled.
 
-**Spatial Input (RGB)**
+```bash
+python dsffn_experiments.py
+```
+
+Or open in Google Colab (recommended — free GPU access):
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com)
+
+Results are printed to console and saved automatically to `output.txt`.
+
+---
+
+## How It Works
+
+### Dual-Stream Input Preprocessing
+
+Every image generates **two inputs** before entering the network:
+
+**Spatial input** — standard RGB pipeline:
+
 ```python
 transforms.Compose([
     transforms.Resize((224, 224)),
@@ -180,62 +189,39 @@ transforms.Compose([
 ])
 ```
 
-**Frequency Input (Phase Spectrum)**
-```python
-# Convert to grayscale
-img_gray = np.array(img_pil.convert('L'))
+**Frequency input** — phase spectrum extraction:
 
-# Compute 2D DFT and shift zero-frequency to center
-dft = cv2.dft(np.float32(img_gray), flags=cv2.DFT_COMPLEX_OUTPUT)
+```python
+img_gray  = np.array(img.convert('L'))
+
+# 2D Discrete Fourier Transform
+dft       = cv2.dft(np.float32(img_gray), flags=cv2.DFT_COMPLEX_OUTPUT)
 dft_shift = np.fft.fftshift(dft)
 
-# Extract phase (angle)
-_, phase = cv2.cartToPolar(dft_shift[:,:,0], dft_shift[:,:,1])
+# Extract phase angle
+_, phase  = cv2.cartToPolar(dft_shift[:,:,0], dft_shift[:,:,1])
 
-# Normalize to [0, 255] and convert to 3-channel image
+# Normalize to [0,255] and convert to 3-channel for EfficientNet
 phase_img = cv2.normalize(phase, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-phase_pil = Image.fromarray(phase_img).convert('RGB')
-
-# Apply same ImageNet normalization
-freq_input = transform(phase_pil)
+freq_input = transform(Image.fromarray(phase_img).convert('RGB'))
 ```
 
----
-
-## Model Definitions
-
-### SpatialOnlyModel / FreqOnlyModel (Baselines)
-
-```python
-class SpatialOnlyModel(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.base_model = models.efficientnet_b0(pretrained=True)
-        num_ftrs = self.base_model.classifier[1].in_features
-        self.base_model.classifier = nn.Sequential(
-            nn.Dropout(p=0.2, inplace=True),
-            nn.Linear(num_ftrs, 1)
-        )
-
-    def forward(self, x):
-        return self.base_model(x)
-```
-
-### DSFFN (Proposed)
+### Model Architecture
 
 ```python
 class DSFFN(nn.Module):
     def __init__(self):
         super().__init__()
+        # Two EfficientNet-B0 backbones, classifier heads removed
         self.spatial_stream = models.efficientnet_b0(pretrained=True)
         self.spatial_stream.classifier = nn.Identity()
 
         self.freq_stream = models.efficientnet_b0(pretrained=True)
         self.freq_stream.classifier = nn.Identity()
 
-        num_ftrs = 1280  # EfficientNet-B0 output features
+        # Fusion head: concatenated features → binary classification
         self.classifier_head = nn.Sequential(
-            nn.Linear(num_ftrs * 2, 512),
+            nn.Linear(1280 * 2, 512),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(512, 1)
@@ -243,102 +229,107 @@ class DSFFN(nn.Module):
 
     def forward(self, x_spatial, x_freq):
         f_spatial = self.spatial_stream(x_spatial)
-        f_freq = self.freq_stream(x_freq)
-        f_fused = torch.cat((f_spatial, f_freq), dim=1)
+        f_freq    = self.freq_stream(x_freq)
+        f_fused   = torch.cat((f_spatial, f_freq), dim=1)
         return self.classifier_head(f_fused)
 ```
 
----
+### Training Configuration
 
-## Training Algorithm
+| Hyperparameter | Value |
+|:---------------|:-----:|
+| Backbone | EfficientNet-B0 (ImageNet pretrained) |
+| Optimizer | Adam |
+| Learning rate | 1e-4 |
+| Batch size | 64 |
+| Epochs | 6 |
+| Loss | BCEWithLogitsLoss |
+| Image size | 224 × 224 |
 
-```
-Algorithm: DSFFN Training Procedure
-Require: Source domains DS, Learning rate η
-
-1. Initialize θ_streams, θ_classifier
-2. for each training iteration:
-   a. Sample batch (X, Y_cls) from DS
-   b. for each image x in X:
-      - Compute phase spectrum x_phase
-      - F_spatial ← SpatialStream(x; θ_streams)
-      - F_freq    ← FrequencyStream(x_phase; θ_streams)
-      - F_fused   ← Concatenate(F_spatial, F_freq)
-      - P_cls     ← ClassifierHead(F_fused; θ_classifier)
-      - L_cls     ← BCE(P_cls, Y_cls)
-   c. L_total ← L_cls
-   d. Update (θ_streams, θ_classifier) via gradient descent
-3. return trained parameters
-```
+> Reduce `BATCH_SIZE` to 32 if you hit CUDA OOM errors on smaller GPUs.
 
 ---
 
-## Output
+## Datasets
 
-Results are automatically printed and saved to `output.txt`:
-
-```
---- Test 1: Intra-Dataset Performance ---
-  Model             |  Accuracy  |  AUC
-  Spatial Only      |   88.79%   |  97.51%
-  Frequency Only    |   72.46%   |  82.27%
-  DSFFN (Fused)     |   90.12%   |  98.01%
-
---- Test 2: Cross-Dataset Generalization ---
-  Model             | Intra-Dataset | Cross-Dataset | Performance Drop
-  Spatial Only      |    88.79%     |    68.14%     |     -20.65%
-  Frequency Only    |    72.46%     |    61.30%     |     -11.16%
-  DSFFN (Fused)     |    90.12%     |    74.52%     |     -15.60%
-```
+| Dataset | Kaggle ID | Role | Train | Test |
+|:--------|:----------|:-----|------:|-----:|
+| Deepfake and Real Images | `manjilkarki/deepfake-and-real-images` | Training + intra-test | 140,000 | 20,000 |
+| Real and Fake Face Detection | `ciplab/real-and-fake-face-detection` | Cross-domain eval only | 0 (unseen) | ~2,041 |
 
 ---
 
-## Hardware Requirements
+## Hardware
 
-| Component | Specification |
-|---|---|
-| GPU | NVIDIA T4 (16GB VRAM) or equivalent |
-| Platform | Google Colab (recommended) |
+Experiments were run on **Google Colab** with an **NVIDIA T4 (16GB VRAM)**.
+
+| Component | Spec |
+|:----------|:-----|
+| GPU | NVIDIA T4 16GB |
 | Python | 3.10 |
 | PyTorch | 2.1 |
 | CUDA | 12.0 |
 
-> **Note:** Reduce `BATCH_SIZE` from 64 if you encounter CUDA out-of-memory errors.
+---
+
+## Why DSFFN Generalizes Better
+
+Two scenarios illustrate the cross-domain improvement:
+
+**Case 1 — Unseen blending artifact**
+A fake from the new dataset uses a technique that leaves no visible spatial boundary. The spatial-only model sees nothing wrong and marks it real. DSFFN's frequency stream detects the phase distortion left by the generative process — a signal that survives across domains — and correctly flags it as fake.
+
+**Case 2 — Real image with compression noise**
+Heavy compression on a genuine image looks like forgery artifacts to a spatial-only model → false positive. The phase spectrum of an authentic image is naturally coherent, so DSFFN's frequency stream pushes back against the false alarm and reduces misclassification.
 
 ---
 
 ## Limitations
 
-- **Static frames only** — no temporal modeling for video deepfakes
-- **Single cross-domain test** — generalization tested against one unseen dataset
-- **Simple feature fusion** — concatenation-based; no learned attention weighting between streams
+- **Static frames only** — no temporal modeling; video-level inconsistencies are not exploited
+- **Single cross-domain benchmark** — tested against one unseen dataset; broader evaluation needed
+- **Concatenation fusion** — learned attention weighting between streams was not explored
 
 ---
 
 ## Future Work
 
-1. **Temporal Extension** — incorporate 3D-CNNs or recurrent layers for video-level detection
-2. **Domain-Adversarial Training** — combine DSFFN's feature extractor with explicit domain alignment (DANN) to further reduce domain shift
-3. **Broader Benchmark Testing** — evaluate against FaceForensics++, CelebDF v2, DFDC, and other standard benchmarks
-4. **Attention-Based Fusion** — replace concatenation with cross-attention or learned weighting to adaptively prioritize the more informative stream per input
+1. **Temporal extension** — 3D-CNNs or recurrent layers for video-level deepfake detection
+2. **Domain-adversarial training** — combine DSFFN's feature extractor with DANN-style alignment to force fused features toward domain invariance
+3. **Attention-based fusion** — replace concatenation with cross-attention to adaptively weight each stream per input
+4. **Broader benchmarks** — evaluate on FaceForensics++, CelebDF v2, and DFDC
+
+---
+
+## Related Work
+
+| Method | Strategy | Benchmark | Score |
+|:-------|:---------|:----------|:-----:|
+| Li et al. (2025) | Domain Generalization | Cross-Dataset Avg | 86.43% AUC |
+| Yang et al. | Feature Disentanglement | Cross-Dataset | 77.90% AUC |
+| Gao et al. (2024) | Texture/Artifact Streams | Custom | 81.44% Acc |
+| Prashnani et al. (2025) | Phase-Based Motion | CelebDFv2 | 92.40% AUC |
+| **DSFFN (Ours)** | **Spatial + Frequency Fusion** | **Cross-Dataset** | **−5.05% gap** |
 
 ---
 
 ## Citation
 
-If you use this work, please cite:
+If you find this work useful, please cite:
 
 ```bibtex
 @article{chaudhari2024dsffn,
-  title     = {DSFFN: Dual-Stream Forgery Fusion Network for Robust Cross-Domain Deepfake Detection},
-  author    = {Chaudhari, Hitesh and Raja, Aayush},
-  institution = {Vellore Institute of Technology},
-  year      = {2024}
+  title       = {DSFFN: Dual-Stream Forgery Fusion Network for Robust Cross-Domain Deepfake Detection},
+  author      = {Chaudhari, Hitesh and Raja, Aayush},
+  institution = {Vellore Institute of Technology, Vellore, India},
+  year        = {2024}
 }
 ```
 
 ---
 
-## License
+<div align="center">
 
-This project is released for academic and research purposes.
+Made at **Vellore Institute of Technology** &nbsp;·&nbsp; For academic use
+
+</div>
