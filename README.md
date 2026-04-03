@@ -1,17 +1,8 @@
 <div align="center">
 
-<br/>
 
-```
-██████╗ ███████╗███████╗███████╗███╗   ██╗
-██╔══██╗██╔════╝██╔════╝██╔════╝████╗  ██║
-██║  ██║███████╗█████╗  █████╗  ██╔██╗ ██║
-██║  ██║╚════██║██╔══╝  ██╔══╝  ██║╚██╗██║
-██████╔╝███████║██║     ██║     ██║ ╚████║
-╚═════╝ ╚══════╝╚═╝     ╚═╝     ╚═╝  ╚═══╝
-```
 
-# Dual-Stream Forgery Fusion Network
+# DSFFN - Dual-Stream Forgery Fusion Network
 
 **Robust Cross-Domain Deepfake Detection**
 
